@@ -18,7 +18,7 @@ extern "C" {
 #ifdef _WIN32
 typedef long speed_t;
 #else
-//#include <termios.h>
+#include <termios.h>
 #endif
 }
 
@@ -32,7 +32,7 @@ typedef long speed_t;
 // Classes
 ////////////////////////////////////////////////////////////////////////////////
 
-typedef int speed_t;
+typedef unsigned int speed_t;
 
 namespace erpc {
 /*!
