@@ -45,7 +45,12 @@ bool MessageLoggers::addMessageLogger(Transport *transport)
 
     if (transport != NULL)
     {
+        Transport *castedTransport;
+        castedTransport = reinterpret_cast<Transport *>(transport);
+        Crc16 * crc16 = new Crc16();
+        castedTransport->setCrc16(crc16);
         logger = create(transport);
+
         if (logger != NULL)
         {
             if (m_logger == NULL)
