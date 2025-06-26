@@ -22,7 +22,7 @@ extern "C" {
 #include <io.h>
 #include <windows.h>
 #else
-//#include <termios.h>
+#include <termios.h>
 #endif
 }
 
@@ -56,10 +56,10 @@ erpc_status_t SerialTransport::init(uint8_t vtime, uint8_t vmin)
 #else
     if (status == kErpcStatus_Success)
     {
-        //if (!isatty(m_serialHandle))
-        //{
-        //    status = kErpcStatus_InitFailed;
-        //}
+        if (!isatty(m_serialHandle))
+        {
+            status = kErpcStatus_InitFailed;
+        }
     }
 #endif
     if (status == kErpcStatus_Success)
@@ -82,10 +82,10 @@ erpc_status_t SerialTransport::init(uint8_t vtime, uint8_t vmin)
 #else
     if (status == kErpcStatus_Success)
     {
-        //if (-1 == tcflush(m_serialHandle, TCIOFLUSH))
-        //{
-        //    status = kErpcStatus_InitFailed;
-        //}
+        if (-1 == tcflush(m_serialHandle, TCIOFLUSH))
+        {
+            status = kErpcStatus_InitFailed;
+        }
     }
 #endif
 
