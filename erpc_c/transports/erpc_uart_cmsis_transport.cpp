@@ -20,7 +20,6 @@ using namespace erpc;
 
 static volatile bool s_isTransferReceiveCompleted = false;
 static volatile bool s_isTransferSendCompleted = false;
-static UartTransport *s_uart_instance = NULL;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Code
@@ -33,7 +32,6 @@ m_uartDrv(uartDrv)
 m_rxSemaphore(), m_txSemaphore()
 #endif
 {
-    s_uart_instance = this;
 }
 
 UartTransport::~UartTransport(void)
@@ -60,9 +58,9 @@ void UartTransport::rx_cb(void)
 }
 
 /* Transfer callback */
-static void TransferCallback(uint32_t event)
+static void TransferCallback(uint32_t event, void *callback_arg)
 {
-    UartTransport *transport = s_uart_instance;
+    UartTransport *transport = (UartTransport*) callback_arg;
 
     if (event == ARM_USART_EVENT_SEND_COMPLETE)
     {
@@ -78,7 +76,7 @@ static void TransferCallback(uint32_t event)
 erpc_status_t UartTransport::init(void)
 {
     erpc_status_t erpcStatus = kErpcStatus_InitFailed;
-    int32_t status = (*m_uartDrv).Initialize(TransferCallback);
+    int32_t status = (*m_uartDrv).Initialize(TransferCallback, this);
 
     if (status == ARM_DRIVER_OK)
     {
