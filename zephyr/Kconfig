@@ -13,7 +13,7 @@ config ERPC
 	help
 	  This option enables the eRPC library
 	depends on CPP
-	depends on FULL_LIBCPP_SUPPORTED
+	#depends on FULL_LIBCPP_SUPPORTED
 
 config ZEPHYR_BUILD
 	bool
@@ -30,6 +30,14 @@ config ERPC_TRANSPORT_UART
 	select RING_BUFFER
 	select SERIAL
 	select UART_INTERRUPT_DRIVEN
+
+config ERPC_TRANSPORT_SPI
+	bool "Enable eRPC SPI transport"
+	help
+	  When enabled, eRPC will include SPI transport layer.
+	select SPI
+# TODO - figure out where to put this...
+	select SPI_B_INTERRUPT
 
 config ERPC_TRANSPORT_TCP
 	bool "Enable eRPC TCP transport"
