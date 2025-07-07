@@ -46,7 +46,7 @@ public:
      * @param[in] srcClock_Hz Source clock.
      */
     //SpiSlaveTransport(SPI_Type *spiBaseAddr, uint32_t baudRate, uint32_t srcClock_Hz);
-    SpiSlaveTransport(void * p_api_ctrl, void * p_cfg, void * p_io_ctrl, uint16_t dready_pin, uint32_t baudRate, uint32_t srcClock_Hz) ;
+    SpiSlaveTransport(void * p_spi_instance, void * p_ioport_instance, uint16_t dready_pin) ;
 
     /*!
      * @brief Destructor.
@@ -68,13 +68,11 @@ public:
     void transfer_cb(void);
 
 protected:
-    spi_ctrl_t *m_api_ctrl;
-    spi_cfg_t *m_cfg;
-    ioport_ctrl_t *m_io_ctrl;
+    spi_instance_t *m_spi_inst;
+    ioport_instance_t *m_ioport_inst;
+    //ioport_ctrl_t *m_io_ctrl;
     bsp_io_port_pin_t m_dready_pin;
-    SPI_Type *m_spiBaseAddr; /*!< Base address of SPI peripheral used in this transport layer */
-    uint32_t m_baudRate;     /*!< Baud rate of SPI peripheral used in this transport layer */
-    uint32_t m_srcClock_Hz;  /*!< Source clock of SPI peripheral used in this transport layer */
+
     bool m_isInited;         /*!< the SPI peripheral init status flag */
 #if ERPC_THREADS
     Semaphore m_txrxSemaphore; /*!< Semaphore used by RTOS to block task until the sending/receiving is not complete */
