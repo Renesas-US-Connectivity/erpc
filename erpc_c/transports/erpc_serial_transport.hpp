@@ -32,6 +32,8 @@ typedef long speed_t;
 // Classes
 ////////////////////////////////////////////////////////////////////////////////
 
+typedef unsigned int speed_t;
+
 namespace erpc {
 /*!
  * @brief Serial transport layer for host PC

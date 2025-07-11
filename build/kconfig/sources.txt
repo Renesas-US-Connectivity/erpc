@@ -1,0 +1,1 @@
+/home/patrick/erpc/server/ra_wifi_erpc_server/r_wifi_erpc_server/erpc/Kconfig

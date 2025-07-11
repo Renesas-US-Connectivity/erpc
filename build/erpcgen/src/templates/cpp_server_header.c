@@ -1,0 +1,56 @@
+/*
+ * AUTOMATICALLY GENERATED FILE - DO NOT EDIT
+ */
+
+// Generated from /home/patrick/erpc/server/ra_wifi_erpc_server/r_wifi_erpc_server/erpc/erpcgen/src/templates/cpp_server_header.template
+extern const char * const kCppServerHeader;
+
+const char * const kCppServerHeader = 
+"{% if mlComment != \"\"%}\n"
+"{$mlComment}\n"
+"\n"
+"{% endif %}\n"
+"{$commonHeader()}\n"
+"\n"
+"#if !defined({$serverCppGuardMacro})\n"
+"#define {$serverCppGuardMacro}\n"
+"\n"
+"#include \"{$interfaceCppHeaderName}\"\n"
+"\n"
+"#include \"erpc_server.hpp\"\n"
+"#include \"{$codecHeader}\"\n"
+"\n"
+"{$checkVersion()}\n"
+"{$>checkCrc()}\n"
+"{$fillNamespaceBegin()>}\n"
+"\n"
+"{% for iface in group.interfaces %}\n"
+"/*!\n"
+" * @brief Service subclass for {$iface.name}.\n"
+" */\n"
+"class {$iface.serviceClassName} : public erpc::Service\n"
+"{\n"
+"public:\n"
+"    {$iface.serviceClassName}({$iface.interfaceClassName} *_{$iface.interfaceClassName});\n"
+"\n"
+"    virtual ~{$iface.serviceClassName}();\n"
+"\n"
+"    /*! @brief return service interface handler. */\n"
+"    {$iface.interfaceClassName}* getHandler(void);\n"
+"\n"
+"    /*! @brief Call the correct server shim based on method unique ID. */\n"
+"    virtual erpc_status_t handleInvocation(uint32_t methodId, uint32_t sequence, erpc::Codec * codec, erpc::MessageBufferFactory *messageFactory, erpc::Transport * transport);\n"
+"\n"
+"private:\n"
+"    {$iface.interfaceClassName} *m_handler;\n"
+"{%  for fn in iface.functions %}\n"
+"    /*! @brief Server shim for {$fn.name} of {$iface.name} interface. */\n"
+"    erpc_status_t {$fn.name}_shim(erpc::{$codecClass} * codec, erpc::MessageBufferFactory *messageFactory, erpc::Transport * transport, uint32_t sequence);{$loop.addNewLineIfNotLast}\n"
+"{%  endfor -- fn %}\n"
+"};\n"
+"\n"
+"{% endfor -- iface %}\n"
+"{$fillNamespaceEnd()}\n"
+"#endif // {$serverCppGuardMacro}\n"
+;
+

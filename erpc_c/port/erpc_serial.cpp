@@ -28,7 +28,7 @@
 #include <errno.h>
 #include <string.h>
 /*included this here for cygwin. need to figure out proper include handling for cygwin */
-//#include <termios.h>
+#include <termios.h>
 
 //#define LINUX 1
 //#ifdef LINUX

@@ -62,6 +62,8 @@ typedef long speed_t;
 extern "C" {
 #endif
 
+typedef unsigned int speed_t;
+
 int serial_setup(int fd, speed_t speed);
 int serial_set_read_timeout(int fd, uint8_t vtime, uint8_t vmin);
 int serial_write(int fd, const char *buf, int size);
