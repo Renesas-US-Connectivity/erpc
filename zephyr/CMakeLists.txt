@@ -54,6 +54,13 @@ if (CONFIG_ERPC)
     ${ERPC_DIR}/setup/erpc_setup_uart_zephyr.cpp
   )
 
+  # Optional SPI transport
+  zephyr_library_sources_ifdef(
+    CONFIG_ERPC_TRANSPORT_SPI
+    ${ERPC_DIR}/transports/erpc_spi_master_zephyr_transport.cpp
+    ${ERPC_DIR}/setup/erpc_setup_spi_master_zephyr.cpp
+  )
+
   # Optional TCP transport
   zephyr_library_sources_ifdef(
     CONFIG_ERPC_TRANSPORT_TCP

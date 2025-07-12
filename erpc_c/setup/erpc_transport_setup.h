@@ -420,6 +420,25 @@ erpc_transport_t erpc_transport_spi_slave_init(void *baseAddr, uint32_t baudRate
  */
 void erpc_transport_spi_slave_deinit(erpc_transport_t transport);
 
+/*!
+ * @brief Create a Zephyr SPI master transport.
+ *
+ * Create a Zephyr SPI master transport instance, to be used at master core.
+ *
+ * // TODO - update parameter list once working
+ * @param[in] dev Zephyr SPI device address.
+ * 
+ * @return Return NULL or erpc_transport_t instance pointer.
+ */
+erpc_transport_t erpc_transport_zephyr_spi_master_init(void *spi, void *gpio);
+
+/*!
+ * @brief Deinitialize Zephyr SPI master transport.
+ *
+ * @param[in] transport Transport which was initialized with init function.
+ */
+void erpc_transport_zephyr_spi_master_deinit(erpc_transport_t transport);
+
 //@}
 
 //! @name SPIdev transport setup

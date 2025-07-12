@@ -31,6 +31,12 @@ config ERPC_TRANSPORT_UART
 	select SERIAL
 	select UART_INTERRUPT_DRIVEN
 
+config ERPC_TRANSPORT_SPI
+	bool "Enable eRPC SPI transport"
+	help
+	  When enabled, eRPC will include SPI transport layer.
+	select SPI
+
 config ERPC_TRANSPORT_TCP
 	bool "Enable eRPC TCP transport"
 	help
