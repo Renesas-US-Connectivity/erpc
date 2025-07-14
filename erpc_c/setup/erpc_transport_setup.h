@@ -413,6 +413,9 @@ void erpc_transport_spi_master_deinit(erpc_transport_t transport);
  */
 erpc_transport_t erpc_transport_spi_slave_init(void *baseAddr, uint32_t baudRate, uint32_t srcClock_Hz);
 
+// TODO Doxygen
+erpc_transport_t erpc_transport_fsp_spi_slave_init(void * p_spi_instance, void * p_ioport_instance, uint16_t dready_pin);
+
 /*!
  * @brief Deinitialize SPI slave transport.
  *
