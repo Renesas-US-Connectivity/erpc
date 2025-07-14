@@ -66,7 +66,8 @@ void ArbitratedClientManager::performClientRequest(RequestContext &request)
 #if ERPC_MESSAGE_LOGGING
     if (request.getCodec()->isStatusOk() == true)
     {
-        err = logMessage(request.getCodec()->getBuffer());
+        MessageBuffer buf = request.getCodec()->getBuffer();
+        err = logMessage(&buf);
         request.getCodec()->updateStatus(err);
     }
 #endif
@@ -96,7 +97,8 @@ void ArbitratedClientManager::performClientRequest(RequestContext &request)
 #if ERPC_MESSAGE_LOGGING
         if (request.getCodec()->isStatusOk() == true)
         {
-            err = logMessage(request.getCodec()->getBuffer());
+            MessageBuffer buf = request.getCodec()->getBuffer();
+            err = logMessage(&buf);
             request.getCodec()->updateStatus(err);
         }
 #endif

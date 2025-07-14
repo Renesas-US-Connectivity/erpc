@@ -155,7 +155,8 @@ erpc_status_t SimpleServer::runInternalEnd(Codec *codec, message_type_t msgType,
         if (msgType != message_type_t::kOnewayMessage)
         {
 #if ERPC_MESSAGE_LOGGING
-            err = logMessage(codec->getBuffer());
+            MessageBuffer buf = codec->getBuffer();
+            err = logMessage(&buf);
             if (err == kErpcStatus_Success)
             {
 #endif
