@@ -45,8 +45,7 @@ public:
      * @param[in] baudRate Baudrate.
      * @param[in] srcClock_Hz Source clock.
      */
-    //SpiSlaveTransport(SPI_Type *spiBaseAddr, uint32_t baudRate, uint32_t srcClock_Hz);
-    SpiSlaveTransport(void * p_spi_instance, void * p_ioport_instance, uint16_t dready_pin) ;
+    SpiSlaveTransport(void * p_spi_instance, void * p_ioport_instance, uint16_t nrdy_pin, uint16_t nint_pin);
 
     /*!
      * @brief Destructor.
@@ -70,8 +69,8 @@ public:
 protected:
     spi_instance_t *m_spi_inst;
     ioport_instance_t *m_ioport_inst;
-    //ioport_ctrl_t *m_io_ctrl;
-    bsp_io_port_pin_t m_dready_pin;
+    bsp_io_port_pin_t m_nrdy_pin;
+    bsp_io_port_pin_t m_nint_pin;
 
     bool m_isInited;         /*!< the SPI peripheral init status flag */
 #if ERPC_THREADS
@@ -106,6 +105,8 @@ private:
 
     void SpiSlaveTransport_NotifyTransferGpioReady(void);
     void SpiSlaveTransport_NotifyTransferGpioCompleted(void);
+    void SpiSlaveTransport_NotifyTransferGpioIntReady(void);
+    void SpiSlaveTransport_NotifyTransferGpioIntCompleted(void);
 };
 
 } // namespace erpc
