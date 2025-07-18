@@ -46,7 +46,7 @@ public:
      * TODO update parameter list
      * @param[in] dev Zephyr SPI device.
      */
-    SpiMasterTransport(struct spi_dt_spec *spi, struct gpio_dt_spec *gpio);
+    SpiMasterTransport(struct spi_dt_spec *spi, struct gpio_dt_spec *rdy, struct gpio_dt_spec *intr);
 
     /*!
      * @brief Destructor.
@@ -62,7 +62,8 @@ public:
 
 protected:
     struct spi_dt_spec *m_spi; /*!< Access structure of the SPI device */
-    struct gpio_dt_spec *m_gpio; /*!< Access structure of the GPIO device */
+    struct gpio_dt_spec *m_rdy; /*!< Access structure of the GPIO device */
+    struct gpio_dt_spec *m_intr; /*!< Access structure of the GPIO device */
 
 private:
     using FramedTransport::underlyingReceive;
