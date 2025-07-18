@@ -43,8 +43,8 @@ static inline void SpidevMasterTransport_WaitForSlaveReadyGpio()
     }
 }
 
-SpiMasterTransport::SpiMasterTransport(struct spi_dt_spec *spi, struct gpio_dt_spec *gpio) :
-m_spi(spi), m_gpio(gpio)
+SpiMasterTransport::SpiMasterTransport(struct spi_dt_spec *spi, struct gpio_dt_spec *rdy, struct gpio_dt_spec *intr) :
+m_spi(spi), m_rdy(rdy), m_intr(intr) 
 {
 }
 
@@ -55,31 +55,31 @@ SpiMasterTransport::~SpiMasterTransport(void)
 
 erpc_status_t SpiMasterTransport::init(void)
 {
-    int ret;
+    //int ret;
 
-    if (!gpio_is_ready_dt(m_gpio)) {
-        // TODO - print error message?
-        return kErpcStatus_Fail;
-    }
+    //if (!gpio_is_ready_dt(m_gpio)) {
+    //    // TODO - print error message?
+    //    return kErpcStatus_Fail;
+    //}
 
-	ret = gpio_pin_configure_dt(m_gpio, GPIO_INPUT);
-	if (ret != 0) {
+	//ret = gpio_pin_configure_dt(m_gpio, GPIO_INPUT);
+	//if (ret != 0) {
+//		// TODO - print error message?
+ //       return kErpcStatus_Fail;
+//	}
+
+//	ret = gpio_pin_interrupt_configure_dt(m_gpio, GPIO_INT_EDGE_TO_INACTIVE);
+//	if (ret != 0) {
 		// TODO - print error message?
-        return kErpcStatus_Fail;
-	}
+  //      return kErpcStatus_Fail;
+	//}
 
-	ret = gpio_pin_interrupt_configure_dt(m_gpio, GPIO_INT_EDGE_TO_INACTIVE);
-	if (ret != 0) {
-		// TODO - print error message?
-        return kErpcStatus_Fail;
-	}
+	//gpio_init_callback(&slave_rdy_cb_data, slave_rdy_gpio_cb, BIT(m_gpio->pin));
+    //gpio_add_callback_dt(m_gpio, &slave_rdy_cb_data);
 
-	gpio_init_callback(&slave_rdy_cb_data, slave_rdy_gpio_cb, BIT(m_gpio->pin));
-    gpio_add_callback_dt(m_gpio, &slave_rdy_cb_data);
-
-    if (gpio_pin_get_dt(m_gpio) != 0) {
-        s_isSlaveReady = true;
-    }
+    //if (gpio_pin_get_dt(m_gpio) != 0) {
+        //s_isSlaveReady = true;
+    //}
 
     return kErpcStatus_Success;
 }
@@ -98,7 +98,7 @@ erpc_status_t SpiMasterTransport::underlyingReceive(uint8_t *data, uint32_t size
     rx.buffers = (const spi_buf*)&buf;
 
     // TODO - Fix me! Make this a wait for a semaphore that is given in GPIO ISR (if threading enabled)
-    while (gpio_pin_get_dt(m_gpio) == 0)
+    while (gpio_pin_get_dt(m_intr) != 0)
     {
         k_msleep(10);
     }
@@ -124,7 +124,10 @@ erpc_status_t SpiMasterTransport::underlyingSend(const uint8_t *data, uint32_t s
     tx.count = 1;
     tx.buffers = (const spi_buf*)&buf;
 
-    //SpidevMasterTransport_WaitForSlaveReadyGpio();
+    while (gpio_pin_get_dt(m_rdy) != 0)
+    {
+        k_msleep(10);
+    }
 
 	ret = spi_write_dt(m_spi, &tx);
     s_isSlaveReady = false;
@@ -134,6 +137,10 @@ erpc_status_t SpiMasterTransport::underlyingSend(const uint8_t *data, uint32_t s
     buf[0].len = size - header_size;
 
     //SpidevMasterTransport_WaitForSlaveReadyGpio();
+    while (gpio_pin_get_dt(m_rdy) != 0)
+    {
+        k_msleep(10);
+    }
 
 	ret = spi_write_dt(m_spi, &tx);
     s_isSlaveReady = false;
@@ -141,10 +148,10 @@ erpc_status_t SpiMasterTransport::underlyingSend(const uint8_t *data, uint32_t s
     return (ret < 0) ? kErpcStatus_SendFailed : kErpcStatus_Success;
 }
 
-extern "C" {
-static void slave_rdy_gpio_cb(const struct device *dev, struct gpio_callback *cb,
-		    uint32_t pins)
-{
-    s_isSlaveReady = true;
-}
-}
+//extern "C" {
+//static void slave_rdy_gpio_cb(const struct device *dev, struct gpio_callback *cb,
+		    //uint32_t pins)
+//{
+    //s_isSlaveReady = true;
+//}
+//}

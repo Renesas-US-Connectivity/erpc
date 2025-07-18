@@ -433,7 +433,7 @@ void erpc_transport_spi_slave_deinit(erpc_transport_t transport);
  * 
  * @return Return NULL or erpc_transport_t instance pointer.
  */
-erpc_transport_t erpc_transport_zephyr_spi_master_init(void *spi, void *gpio);
+erpc_transport_t erpc_transport_zephyr_spi_master_init(void *spi, void *rdy, void *intr);
 
 /*!
  * @brief Deinitialize Zephyr SPI master transport.
