@@ -50,15 +50,26 @@ static inline void SpiSlaveTransport_NotifyTransferGpioInit(void)
 //static inline void SpiSlaveTransport_NotifyTransferGpioReady(void)
 void SpiSlaveTransport::SpiSlaveTransport_NotifyTransferGpioReady(void)
 {
-    R_GPIO_W_PinWrite(m_ioport_inst->p_ctrl, m_dready_pin, BSP_IO_LEVEL_LOW);
+    R_GPIO_W_PinWrite(m_ioport_inst->p_ctrl, m_nrdy_pin, BSP_IO_LEVEL_HIGH);
 }
 
 /* @brief Notify the SPI Master that the Slave has finished the transfer */
 //static inline void SpiSlaveTransport_NotifyTransferGpioCompleted(void)
 void SpiSlaveTransport::SpiSlaveTransport_NotifyTransferGpioCompleted(void)
 {
-    R_GPIO_W_PinWrite(m_ioport_inst->p_ctrl, m_dready_pin, BSP_IO_LEVEL_HIGH);
+    R_GPIO_W_PinWrite(m_ioport_inst->p_ctrl, m_nrdy_pin, BSP_IO_LEVEL_LOW);
 }
+
+void SpiSlaveTransport::SpiSlaveTransport_NotifyTransferGpioIntReady(void)
+{
+    R_GPIO_W_PinWrite(m_ioport_inst->p_ctrl, m_nint_pin, BSP_IO_LEVEL_HIGH);
+}
+
+void SpiSlaveTransport::SpiSlaveTransport_NotifyTransferGpioIntCompleted(void)
+{
+    R_GPIO_W_PinWrite(m_ioport_inst->p_ctrl, m_nint_pin, BSP_IO_LEVEL_LOW);
+}
+
 #endif
 
 void SpiSlaveTransport::transfer_cb(void)
@@ -80,8 +91,8 @@ static void SPI_SlaveUserCallback(spi_callback_args_t * p_args)
     }
 }
 
-SpiSlaveTransport::SpiSlaveTransport(void * p_spi_instance, void * p_ioport_instance, uint16_t dready_pin):
-m_spi_inst((spi_instance_t*)p_spi_instance), m_ioport_inst((ioport_instance_t*)p_ioport_instance), m_dready_pin((bsp_io_port_pin_t)dready_pin), m_isInited(false)
+SpiSlaveTransport::SpiSlaveTransport(void * p_spi_instance, void * p_ioport_instance, uint16_t nrdy_pin, uint16_t nint_pin):
+m_spi_inst((spi_instance_t*)p_spi_instance), m_ioport_inst((ioport_instance_t*)p_ioport_instance), m_nrdy_pin((bsp_io_port_pin_t)nrdy_pin), m_nint_pin((bsp_io_port_pin_t)nint_pin), m_isInited(false)
 #if ERPC_THREADS
 ,
 m_txrxSemaphore()
@@ -193,7 +204,7 @@ erpc_status_t SpiSlaveTransport::underlyingSend(const uint8_t *data, uint32_t si
         if (FSP_SUCCESS == status)
         {
 #ifdef ERPC_BOARD_SPI_SLAVE_READY_USE_GPIO
-            SpiSlaveTransport_NotifyTransferGpioReady();
+        	SpiSlaveTransport_NotifyTransferGpioIntReady();
 #endif
 
 /* wait until the sending is finished */
@@ -206,7 +217,7 @@ erpc_status_t SpiSlaveTransport::underlyingSend(const uint8_t *data, uint32_t si
 #endif
 
 #ifdef ERPC_BOARD_SPI_SLAVE_READY_USE_GPIO
-            SpiSlaveTransport_NotifyTransferGpioCompleted();
+            SpiSlaveTransport_NotifyTransferGpioIntCompleted();
 #endif
         }
 #ifdef ERPC_BOARD_SPI_SLAVE_READY_USE_GPIO
@@ -247,7 +258,7 @@ erpc_status_t SpiSlaveTransport::underlyingSend(const uint8_t *data, uint32_t si
         if (FSP_SUCCESS == status)
         {
 #ifdef ERPC_BOARD_SPI_SLAVE_READY_USE_GPIO
-            SpiSlaveTransport_NotifyTransferGpioReady();
+        	SpiSlaveTransport_NotifyTransferGpioIntReady();
 #endif
 
 /* wait until the sending is finished */
@@ -260,7 +271,7 @@ erpc_status_t SpiSlaveTransport::underlyingSend(const uint8_t *data, uint32_t si
 #endif
 
 #ifdef ERPC_BOARD_SPI_SLAVE_READY_USE_GPIO
-            SpiSlaveTransport_NotifyTransferGpioCompleted();
+            SpiSlaveTransport_NotifyTransferGpioIntCompleted();
 #endif
         }
 #ifdef ERPC_BOARD_SPI_SLAVE_READY_USE_GPIO
