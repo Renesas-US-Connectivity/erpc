@@ -74,6 +74,8 @@ void SpiSlaveTransport::SpiSlaveTransport_NotifyTransferGpioIntCompleted(void)
 
 void SpiSlaveTransport::transfer_cb(void)
 {
+	SpiSlaveTransport_NotifyTransferGpioCompleted();
+
 #if ERPC_THREADS
     m_txrxSemaphore.putFromISR();
 #else
@@ -146,6 +148,8 @@ erpc_status_t SpiSlaveTransport::underlyingReceive(uint8_t *data, uint32_t size)
     size_t dataSize = size;
     s_isTransferCompleted = false;
 
+    //vTaskSuspendAll();
+
     status = R_SPI_W_Read(m_spi_inst->p_ctrl,
                           rxData,
                           dataSize,
@@ -170,6 +174,8 @@ erpc_status_t SpiSlaveTransport::underlyingReceive(uint8_t *data, uint32_t size)
         SpiSlaveTransport_NotifyTransferGpioCompleted();
 #endif
     }
+
+    //xTaskResumeAll();
 
     return (status != FSP_SUCCESS) ? kErpcStatus_ReceiveFailed : kErpcStatus_Success;
 }
