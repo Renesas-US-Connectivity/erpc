@@ -87,7 +87,7 @@ erpc_status_t SpiMasterTransport::init(void)
 erpc_status_t SpiMasterTransport::underlyingReceive(uint8_t *data, uint32_t size)
 {
 	int ret = 0;
-
+    erpc_status_t status = kErpcStatus_ReceiveFailed;
     struct spi_buf buf[1];
     struct spi_buf_set rx;
 
@@ -98,13 +98,16 @@ erpc_status_t SpiMasterTransport::underlyingReceive(uint8_t *data, uint32_t size
     rx.buffers = (const spi_buf*)&buf;
 
     // TODO - Fix me! Make this a wait for a semaphore that is given in GPIO ISR (if threading enabled)
-    while (gpio_pin_get_dt(m_intr) != 0)
+    if (gpio_pin_get_dt(m_intr) != 0)
     {
-        k_msleep(10);
+        ret = spi_read_dt(m_spi, &rx);
+
+        if (ret = 0) {
+            status = kErpcStatus_Success;
+        }
     }
     //SpidevMasterTransport_WaitForSlaveReadyGpio();
 
-    ret = spi_read_dt(m_spi, &rx);
     s_isSlaveReady = false;
 
     return (ret < 0) ? kErpcStatus_SendFailed : kErpcStatus_Success;
@@ -124,7 +127,7 @@ erpc_status_t SpiMasterTransport::underlyingSend(const uint8_t *data, uint32_t s
     tx.count = 1;
     tx.buffers = (const spi_buf*)&buf;
 
-    while (gpio_pin_get_dt(m_rdy) != 0)
+    while (gpio_pin_get_dt(m_rdy) == 0)
     {
         k_msleep(10);
     }
@@ -137,7 +140,7 @@ erpc_status_t SpiMasterTransport::underlyingSend(const uint8_t *data, uint32_t s
     buf[0].len = size - header_size;
 
     //SpidevMasterTransport_WaitForSlaveReadyGpio();
-    while (gpio_pin_get_dt(m_rdy) != 0)
+    while (gpio_pin_get_dt(m_rdy) == 0)
     {
         k_msleep(10);
     }
