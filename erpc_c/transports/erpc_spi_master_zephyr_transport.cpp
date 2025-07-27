@@ -102,7 +102,8 @@ erpc_status_t SpiMasterTransport::underlyingReceive(uint8_t *data, uint32_t size
     {
         ret = spi_read_dt(m_spi, &rx);
 
-        if (ret = 0) {
+        if (ret == 0) {
+            k_msleep(10);
             status = kErpcStatus_Success;
         }
     }
