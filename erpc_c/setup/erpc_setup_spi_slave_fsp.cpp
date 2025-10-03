@@ -20,8 +20,7 @@ ERPC_MANUALLY_CONSTRUCTED_STATIC(SpiSlaveTransport, s_spiTransport);
 // Code
 ////////////////////////////////////////////////////////////////////////////////
 
-//erpc_transport_t erpc_transport_spi_slave_init(void *baseAddr, uint32_t baudRate, uint32_t srcClock_Hz)
-erpc_transport_t erpc_transport_fsp_spi_slave_init(void * p_spi_instance, void * p_ioport_instance, uint16_t nrdy_pin, uint16_t nint_pin)
+erpc_transport_t erpc_transport_fsp_spi_slave_init(void * p_spi_instance, void * p_ioport_instance, uint16_t int_pin)
 {
     SpiSlaveTransport *spiTransport;
 
@@ -36,8 +35,7 @@ erpc_transport_t erpc_transport_fsp_spi_slave_init(void * p_spi_instance, void *
         spiTransport = s_spiTransport.get();
     }
 #elif ERPC_ALLOCATION_POLICY == ERPC_ALLOCATION_POLICY_DYNAMIC
-    //spiTransport = new SpiSlaveTransport(reinterpret_cast<SPI_Type *>(baseAddr), baudRate, srcClock_Hz); // TODO cast void pointer
-    spiTransport = new SpiSlaveTransport(p_spi_instance, p_ioport_instance, nrdy_pin, nint_pin);
+    spiTransport = new SpiSlaveTransport(p_spi_instance, p_ioport_instance, int_pin);
 #else
 #error "Unknown eRPC allocation policy!"
 #endif

@@ -45,7 +45,7 @@ public:
      * @param[in] baudRate Baudrate.
      * @param[in] srcClock_Hz Source clock.
      */
-    SpiSlaveTransport(void * p_spi_instance, void * p_ioport_instance, uint16_t nrdy_pin, uint16_t nint_pin);
+    SpiSlaveTransport(void * p_spi_instance, void * p_ioport_instance, uint16_t int_pin);
 
     /*!
      * @brief Destructor.
@@ -69,9 +69,7 @@ public:
 protected:
     spi_instance_t *m_spi_inst;
     ioport_instance_t *m_ioport_inst;
-    bsp_io_port_pin_t m_nrdy_pin;
-    bsp_io_port_pin_t m_nint_pin;
-
+    bsp_io_port_pin_t m_int_pin;
     bool m_isInited;         /*!< the SPI peripheral init status flag */
 #if ERPC_THREADS
     Semaphore m_txrxSemaphore; /*!< Semaphore used by RTOS to block task until the sending/receiving is not complete */
@@ -103,10 +101,9 @@ private:
      */
     virtual erpc_status_t underlyingSend(const uint8_t *data, uint32_t size) override;
 
+    void SpiSlaveTransport_NotifyTransferGpioInit(void);
     void SpiSlaveTransport_NotifyTransferGpioReady(void);
     void SpiSlaveTransport_NotifyTransferGpioCompleted(void);
-    void SpiSlaveTransport_NotifyTransferGpioIntReady(void);
-    void SpiSlaveTransport_NotifyTransferGpioIntCompleted(void);
 };
 
 } // namespace erpc
