@@ -43,10 +43,10 @@ public:
     /*!
      * @brief Constructor.
      *
-     * TODO update parameter list
      * @param[in] dev Zephyr SPI device.
+     * @param[in] int_pin Zephyr GPIO device.
      */
-    SpiMasterTransport(struct spi_dt_spec *spi, struct gpio_dt_spec *rdy, struct gpio_dt_spec *intr);
+    SpiMasterTransport(struct spi_dt_spec *dev, struct gpio_dt_spec *int_pin);
 
     /*!
      * @brief Destructor.
@@ -60,10 +60,19 @@ public:
      */
     virtual erpc_status_t init(void);
 
+    /*!
+     * @brief Function called when nINT GPIO input is asserted signalling the slave is ready
+     *
+     * Unblocks the send and receive functions.
+     */
+    void ready_cb(void);
+
 protected:
-    struct spi_dt_spec *m_spi; /*!< Access structure of the SPI device */
-    struct gpio_dt_spec *m_rdy; /*!< Access structure of the GPIO device */
-    struct gpio_dt_spec *m_intr; /*!< Access structure of the GPIO device */
+    struct spi_dt_spec *m_dev; /*!< Access structure of the SPI device */
+    struct gpio_dt_spec *m_int_pin; /*!< Access structure of the GPIO device */
+#if ERPC_THREADS
+    Semaphore m_slaveReadySemaphore;
+#endif
 
 private:
     using FramedTransport::underlyingReceive;

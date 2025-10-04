@@ -17,79 +17,107 @@ using namespace erpc;
 // Definitions
 ////////////////////////////////////////////////////////////////////////////////
 
-//#ifndef ERPC_BOARD_SPI_INT_GPIO
-//#error "Please define the ERPC_BOARD_SPI_INT_GPIO used to notify when the SPI Slave is ready to transmit"
-//#endif
+// TODO - need to figure out if we can automatically set this definition based
+//        on the presence (or otherwise) of the int-gpios property in the device
+//        tree node. Alternatively could this be a Kconfig option?
+#define ERPC_BOARD_SPI_SLAVE_READY_USE_GPIO
 
 ////////////////////////////////////////////////////////////////////////////////
 // Variables
 ////////////////////////////////////////////////////////////////////////////////
 
+#ifdef ERPC_BOARD_SPI_SLAVE_READY_USE_GPIO
+#if ERPC_THREADS_IS(NONE)
 static volatile bool s_isSlaveReady = false;
+#endif
+static struct gpio_callback n_int_cb_data;
+#endif
 
-static struct gpio_callback slave_rdy_cb_data;
+static SpiMasterTransport *s_spi_master_instance = NULL;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Code
 ////////////////////////////////////////////////////////////////////////////////
 extern "C" {
-static void slave_rdy_gpio_cb(const struct device *dev, struct gpio_callback *cb, uint32_t pins);
+static void n_int_cb(const struct device *dev, struct gpio_callback *cb, uint32_t pins);
 }
 
-static inline void SpidevMasterTransport_WaitForSlaveReadyGpio()
+SpiMasterTransport::SpiMasterTransport(struct spi_dt_spec *dev, struct gpio_dt_spec *int_pin) :
+m_dev(dev), m_int_pin(int_pin)
+#if ERPC_THREADS
+,
+m_slaveReadySemaphore()
+#endif
 {
-    while (!s_isSlaveReady)
-    {
-    }
-}
-
-SpiMasterTransport::SpiMasterTransport(struct spi_dt_spec *spi, struct gpio_dt_spec *rdy, struct gpio_dt_spec *intr) :
-m_spi(spi), m_rdy(rdy), m_intr(intr) 
-{
+    s_spi_master_instance = this;
 }
 
 SpiMasterTransport::~SpiMasterTransport(void)
 {
-    //SPI_Deinit(m_spiBaseAddr);
 }
 
 erpc_status_t SpiMasterTransport::init(void)
 {
-    //int ret;
+#ifdef ERPC_BOARD_SPI_SLAVE_READY_USE_GPIO
+    int ret;
 
-    //if (!gpio_is_ready_dt(m_gpio)) {
-    //    // TODO - print error message?
-    //    return kErpcStatus_Fail;
-    //}
+    if (!gpio_is_ready_dt(m_int_pin)) {
+        return kErpcStatus_Fail;
+    }
 
-	//ret = gpio_pin_configure_dt(m_gpio, GPIO_INPUT);
-	//if (ret != 0) {
-//		// TODO - print error message?
- //       return kErpcStatus_Fail;
-//	}
+    ret = gpio_pin_configure_dt(m_int_pin, GPIO_INPUT);
+	if (ret != 0) {
+        return kErpcStatus_Fail;
+    }
 
-//	ret = gpio_pin_interrupt_configure_dt(m_gpio, GPIO_INT_EDGE_TO_INACTIVE);
-//	if (ret != 0) {
-		// TODO - print error message?
-  //      return kErpcStatus_Fail;
-	//}
+    ret = gpio_pin_interrupt_configure_dt(m_int_pin, GPIO_INT_EDGE_FALLING);
+    if (ret < 0) {
+        return kErpcStatus_Fail;
+    }
 
-	//gpio_init_callback(&slave_rdy_cb_data, slave_rdy_gpio_cb, BIT(m_gpio->pin));
-    //gpio_add_callback_dt(m_gpio, &slave_rdy_cb_data);
+    gpio_init_callback(&n_int_cb_data, n_int_cb, BIT(m_int_pin->pin));
 
-    //if (gpio_pin_get_dt(m_gpio) != 0) {
-        //s_isSlaveReady = true;
-    //}
+    ret = gpio_add_callback(m_int_pin->port, &n_int_cb_data);
+    if (ret < 0) {
+        return kErpcStatus_Fail;
+    }
+
+    if (gpio_pin_get_dt(m_int_pin) != 0) {
+#if ERPC_THREADS_IS(NONE)
+        s_isSlaveReady = true;
+#else
+//        m_slaveReadySemaphore.put();
+#endif
+    }
+
+#endif
 
     return kErpcStatus_Success;
 }
 
+void SpiMasterTransport::ready_cb(void)
+{
+#if ERPC_THREADS
+    m_slaveReadySemaphore.put();
+#endif
+}
+
 erpc_status_t SpiMasterTransport::underlyingReceive(uint8_t *data, uint32_t size)
 {
-	int ret = 0;
-    erpc_status_t status = kErpcStatus_ReceiveFailed;
+    int ret = 0;
     struct spi_buf buf[1];
     struct spi_buf_set rx;
+
+#ifdef ERPC_BOARD_SPI_SLAVE_READY_USE_GPIO
+#if ERPC_THREADS_IS(NONE)
+    while (!s_isSlaveReady)
+    {
+    }
+    s_isSlaveReady = false;
+#else
+    m_slaveReadySemaphore.get();
+#endif
+#endif
 
     buf[0].buf = (void *)data;
     buf[0].len = size;
@@ -97,19 +125,7 @@ erpc_status_t SpiMasterTransport::underlyingReceive(uint8_t *data, uint32_t size
     rx.count = 1;
     rx.buffers = (const spi_buf*)&buf;
 
-    // TODO - Fix me! Make this a wait for a semaphore that is given in GPIO ISR (if threading enabled)
-    if (gpio_pin_get_dt(m_intr) != 0)
-    {
-        ret = spi_read_dt(m_spi, &rx);
-
-        if (ret == 0) {
-            k_msleep(10);
-            status = kErpcStatus_Success;
-        }
-    }
-    //SpidevMasterTransport_WaitForSlaveReadyGpio();
-
-    s_isSlaveReady = false;
+    ret = spi_read_dt(m_dev, &rx);
 
     return (ret < 0) ? kErpcStatus_SendFailed : kErpcStatus_Success;
 }
@@ -117,45 +133,59 @@ erpc_status_t SpiMasterTransport::underlyingReceive(uint8_t *data, uint32_t size
 erpc_status_t SpiMasterTransport::underlyingSend(const uint8_t *data, uint32_t size)
 {
     int ret;
-    uint32_t header_size = reserveHeaderSize();
     struct spi_buf buf[1];
     struct spi_buf_set tx;
+    uint32_t header_size = reserveHeaderSize();
 
-    /* send the header first */
+    /* Send the header first */
     buf[0].buf = (void *)data;
     buf[0].len = header_size;
 
     tx.count = 1;
     tx.buffers = (const spi_buf*)&buf;
 
-    while (gpio_pin_get_dt(m_rdy) == 0)
+#ifdef ERPC_BOARD_SPI_SLAVE_READY_USE_GPIO
+#if ERPC_THREADS_IS(NONE)
+    while (!s_isSlaveReady)
     {
-        k_msleep(10);
     }
-
-	ret = spi_write_dt(m_spi, &tx);
     s_isSlaveReady = false;
+#else
+    m_slaveReadySemaphore.get();
+#endif
+#endif
 
-    /* send the payload now */
+    ret = spi_write_dt(m_dev, &tx);
+
+    /* Send the payload now */
     buf[0].buf = (void *)(data + header_size);
     buf[0].len = size - header_size;
 
-    //SpidevMasterTransport_WaitForSlaveReadyGpio();
-    while (gpio_pin_get_dt(m_rdy) == 0)
+#ifdef ERPC_BOARD_SPI_SLAVE_READY_USE_GPIO
+#if ERPC_THREADS_IS(NONE)
+    while (!s_isSlaveReady)
     {
-        k_msleep(10);
     }
-
-	ret = spi_write_dt(m_spi, &tx);
     s_isSlaveReady = false;
+#else
+    m_slaveReadySemaphore.get();
+#endif
+#endif
+
+    ret = spi_write_dt(m_dev, &tx);
 
     return (ret < 0) ? kErpcStatus_SendFailed : kErpcStatus_Success;
 }
 
-//extern "C" {
-//static void slave_rdy_gpio_cb(const struct device *dev, struct gpio_callback *cb,
-		    //uint32_t pins)
-//{
-    //s_isSlaveReady = true;
-//}
-//}
+#ifdef ERPC_BOARD_SPI_SLAVE_READY_USE_GPIO
+extern "C" {
+static void n_int_cb(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
+{
+#if ERPC_THREADS_IS(NONE)
+    s_isSlaveReady = true;
+#else
+    s_spi_master_instance->ready_cb();
+#endif
+}
+}
+#endif

@@ -20,7 +20,7 @@ ERPC_MANUALLY_CONSTRUCTED_STATIC(SpiMasterTransport, s_spiTransport);
 // Code
 ////////////////////////////////////////////////////////////////////////////////
 
-erpc_transport_t erpc_transport_zephyr_spi_master_init(void *spi, void *rdy, void *intr)
+erpc_transport_t erpc_transport_zephyr_spi_master_init(void *dev, void *int_pin)
 {
     SpiMasterTransport *spiTransport;
 
@@ -31,11 +31,11 @@ erpc_transport_t erpc_transport_zephyr_spi_master_init(void *spi, void *rdy, voi
     }
     else
     {
-        s_spiTransport.construct(reinterpret_cast<struct spi_dt_spec *>(spi), reinterpret_cast<struct gpio_dt_spec *>(gpio));
+        s_spiTransport.construct(reinterpret_cast<struct spi_dt_spec *>(dev), reinterpret_cast<struct gpio_dt_spec *>(int_pin));
         spiTransport = s_spiTransport.get();
     }
 #elif ERPC_ALLOCATION_POLICY == ERPC_ALLOCATION_POLICY_DYNAMIC
-    spiTransport = new SpiMasterTransport(reinterpret_cast<struct spi_dt_spec *>(spi), reinterpret_cast<struct gpio_dt_spec *>(rdy), reinterpret_cast<struct gpio_dt_spec *>(intr));
+    spiTransport = new SpiMasterTransport(reinterpret_cast<struct spi_dt_spec *>(dev), reinterpret_cast<struct gpio_dt_spec *>(int_pin));
 #else
 #error "Unknown eRPC allocation policy!"
 #endif
