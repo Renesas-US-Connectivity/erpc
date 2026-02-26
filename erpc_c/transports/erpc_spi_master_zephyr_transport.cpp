@@ -21,10 +21,8 @@ using namespace erpc;
 //        on the presence (or otherwise) of the int-gpios property in the device
 //        tree node. Alternatively could this be a Kconfig option?
 #define ERPC_BOARD_SPI_SLAVE_READY_USE_GPIO
-#define ERPC_OPERATION_TOUT_MS (30ULL * 1000ULL * 1000ULL) // 30 Billion wraps uint32_t
-#define ERPC_OPERATION_TOUT_US (30ULL * 1000ULL * 1000ULL) // Wait, actually I will redefine it to 30 million
-#undef ERPC_OPERATION_TOUT_MS
-#define ERPC_OPERATION_TOUT_MS (30000000UL) // 30 seconds in microseconds
+#define ERPC_OPERATION_TOUT_MS (30ULL * 1000ULL * 1000ULL)
+
 ////////////////////////////////////////////////////////////////////////////////
 // Variables
 ////////////////////////////////////////////////////////////////////////////////
