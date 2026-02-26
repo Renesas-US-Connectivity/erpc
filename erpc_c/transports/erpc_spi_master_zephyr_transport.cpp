@@ -21,7 +21,10 @@ using namespace erpc;
 //        on the presence (or otherwise) of the int-gpios property in the device
 //        tree node. Alternatively could this be a Kconfig option?
 #define ERPC_BOARD_SPI_SLAVE_READY_USE_GPIO
-
+#define ERPC_OPERATION_TOUT_MS (30ULL * 1000ULL * 1000ULL) // 30 Billion wraps uint32_t
+#define ERPC_OPERATION_TOUT_US (30ULL * 1000ULL * 1000ULL) // Wait, actually I will redefine it to 30 million
+#undef ERPC_OPERATION_TOUT_MS
+#define ERPC_OPERATION_TOUT_MS (30000000UL) // 30 seconds in microseconds
 ////////////////////////////////////////////////////////////////////////////////
 // Variables
 ////////////////////////////////////////////////////////////////////////////////
@@ -86,7 +89,7 @@ erpc_status_t SpiMasterTransport::init(void)
 #if ERPC_THREADS_IS(NONE)
         s_isSlaveReady = true;
 #else
-//        m_slaveReadySemaphore.put();
+        m_slaveReadySemaphore.put();
 #endif
     }
 
@@ -115,7 +118,15 @@ erpc_status_t SpiMasterTransport::underlyingReceive(uint8_t *data, uint32_t size
     }
     s_isSlaveReady = false;
 #else
-    m_slaveReadySemaphore.get();
+#ifdef ERPC_OPERATION_TOUT_MS
+    ret = m_slaveReadySemaphore.get(ERPC_OPERATION_TOUT_MS);
+    if (!ret) {
+        return kErpcStatus_Timeout;
+    }
+#else
+    ret = m_slaveReadySemaphore.get();
+#endif
+
 #endif
 #endif
 
@@ -151,7 +162,16 @@ erpc_status_t SpiMasterTransport::underlyingSend(const uint8_t *data, uint32_t s
     }
     s_isSlaveReady = false;
 #else
-    m_slaveReadySemaphore.get();
+
+#ifdef ERPC_OPERATION_TOUT_MS
+    ret = m_slaveReadySemaphore.get(ERPC_OPERATION_TOUT_MS);
+    if (!ret) {
+        return kErpcStatus_Timeout;
+    }
+#else
+    ret = m_slaveReadySemaphore.get();
+#endif
+
 #endif
 #endif
 

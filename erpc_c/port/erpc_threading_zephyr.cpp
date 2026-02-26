@@ -132,7 +132,7 @@ bool Semaphore::get(uint32_t timeoutUsecs)
         }
     }
 
-    return (k_sem_take(&m_sem, K_USEC(timeoutUsecs)) == 0);
+    return (k_sem_take(&m_sem, K_MSEC(timeoutUsecs)) == 0);
 }
 
 int Semaphore::getCount(void) const
