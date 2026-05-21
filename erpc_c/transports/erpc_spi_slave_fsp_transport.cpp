@@ -45,7 +45,7 @@ void SpiSlaveTransport::SpiSlaveTransport_NotifyTransferGpioInit(void)
 {
 	uint32_t pin_cfg = ((uint32_t) IOPORT_CFG_DRIVE_STRENGTH_BA_8MA
 					  | (uint32_t) IOPORT_CFG_PORT_DIRECTION_OUTPUT
-					  | (uint32_t) IOPORT_CFG_PORT_OUTPUT_HIGH
+					  | (uint32_t) IOPORT_CFG_PORT_OUTPUT_LOW
 					  | (uint32_t) IOPORT_CFG_SLEW_RATE_SLOW);
 
 	R_GPIO_W_PinCfg(m_ioport_inst->p_ctrl, m_int_pin, pin_cfg);
@@ -55,14 +55,14 @@ void SpiSlaveTransport::SpiSlaveTransport_NotifyTransferGpioInit(void)
 //static inline void SpiSlaveTransport_NotifyTransferGpioReady(void)
 void SpiSlaveTransport::SpiSlaveTransport_NotifyTransferGpioReady(void)
 {
-	R_GPIO_W_PinWrite(m_ioport_inst->p_ctrl, m_int_pin, BSP_IO_LEVEL_LOW);
+	R_GPIO_W_PinWrite(m_ioport_inst->p_ctrl, m_int_pin, BSP_IO_LEVEL_HIGH);
 }
 
 /* @brief Notify the SPI Master that the Slave has finished the transfer */
 //static inline void SpiSlaveTransport_NotifyTransferGpioCompleted(void)
 void SpiSlaveTransport::SpiSlaveTransport_NotifyTransferGpioCompleted(void)
 {
-	R_GPIO_W_PinWrite(m_ioport_inst->p_ctrl, m_int_pin, BSP_IO_LEVEL_HIGH);
+	R_GPIO_W_PinWrite(m_ioport_inst->p_ctrl, m_int_pin, BSP_IO_LEVEL_LOW);
 }
 
 #endif
