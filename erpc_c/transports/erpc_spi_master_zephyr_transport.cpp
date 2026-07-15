@@ -70,7 +70,7 @@ erpc_status_t SpiMasterTransport::init(void)
         return kErpcStatus_Fail;
     }
 
-    ret = gpio_pin_interrupt_configure_dt(m_int_pin, GPIO_INT_EDGE_FALLING);
+    ret = gpio_pin_interrupt_configure_dt(m_int_pin, GPIO_INT_EDGE_TO_ACTIVE);
     if (ret < 0) {
         return kErpcStatus_Fail;
     }
