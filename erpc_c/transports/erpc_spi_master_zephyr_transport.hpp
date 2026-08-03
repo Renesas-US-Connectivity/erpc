@@ -22,7 +22,7 @@ extern "C" {
 }
 
 /*!
- * @addtogroup spi_master_transport
+ * @addtogroup abs_master_transport
  * @{
  * @file
  */
@@ -33,43 +33,50 @@ extern "C" {
 
 namespace erpc {
 /*!
- * @brief Very basic transport to send/receive messages via SPI.
+ * @brief Transport to send/receive messages via the transport.
  *
- * @ingroup spi_master_transport
+ * @ingroup abs_master_transport
  */
-class SpiMasterTransport : public FramedTransport
+class AbsMasterTransport : public FramedTransport
 {
 public:
     /*!
      * @brief Constructor.
      *
-     * @param[in] dev Zephyr SPI device.
-     * @param[in] int_pin Zephyr GPIO device.
+     * @param[in] p_abs_instance Pointer to transport instance.
+     * @param[in] p_ioport_instance Pointer to IOPORT instance.
+     * @param[in] int_pin GPIO pin number used for nINT signal from slave.
      */
-    SpiMasterTransport(struct spi_dt_spec *dev, struct gpio_dt_spec *int_pin);
+    AbsMasterTransport(void * p_abs_instance, void * p_ioport_instance, uint16_t int_pin);
 
     /*!
      * @brief Destructor.
      */
-    virtual ~SpiMasterTransport(void);
+    virtual ~AbsMasterTransport(void);
 
     /*!
-     * @brief Initialize SPI peripheral configuration structure with values specified in SpiTransport constructor.
+     * @brief Initialize the transport peripheral configuration structure with values specified in AbsTransport constructor.
      *
      * @retval kErpcStatus_Success Always returns success status.
      */
     virtual erpc_status_t init(void);
 
     /*!
-     * @brief Function called when nINT GPIO input is asserted signalling the slave is ready
+     * @brief Function called when nINT GPIO input is asserted signaling the slave is ready
      *
      * Unblocks the send and receive functions.
      */
     void ready_cb(void);
 
 protected:
-    struct spi_dt_spec *m_dev; /*!< Access structure of the SPI device */
-    struct gpio_dt_spec *m_int_pin; /*!< Access structure of the GPIO device */
+#if (CFG_ERPC_TRANSPORT == ERPC_TRANSPORT_UART)
+    uart_instance_t *m_abs_inst;
+#elif (CFG_ERPC_TRANSPORT == ERPC_TRANSPORT_SPI)
+    spi_instance_t *m_abs_inst;
+#endif
+    ioport_instance_t *m_ioport_inst;
+    bsp_io_port_pin_t m_int_pin;
+    bool m_isInited;         /*!< the transport peripheral init status flag */
 #if ERPC_THREADS
     Semaphore m_slaveReadySemaphore;
 #endif
@@ -79,30 +86,33 @@ private:
     using FramedTransport::underlyingSend;
 
     /*!
-     * @brief Receive data from SPI peripheral.
+     * @brief Receive data from the transport peripheral.
      *
      * @param[inout] data Preallocated buffer for receiving data.
      * @param[in] size Size of data to read.
      *
-     * @retval kErpcStatus_ReceiveFailed SPI failed to receive data.
+     * @retval kErpcStatus_ReceiveFailed Transport failed to receive data.
      * @retval kErpcStatus_Success Successfully received all data.
      */
     virtual erpc_status_t underlyingReceive(uint8_t *data, uint32_t size) override;
 
     /*!
-     * @brief Write data to SPI peripheral.
+     * @brief Write data to the transport peripheral.
      *
      * @param[in] data Buffer to send.
      * @param[in] size Size of data to send.
      *
-     * @retval kErpcStatus_SendFailed SPI failed to send data.
+     * @retval kErpcStatus_SendFailed Transport failed to send data.
      * @retval kErpcStatus_Success Successfully sent all data.
      */
     virtual erpc_status_t underlyingSend(const uint8_t *data, uint32_t size) override;
+
+    // Block until the slave asserts ready
+    void wait_for_slave_ready();
 };
 
 } // namespace erpc
 
 /*! @} */
 
-#endif // _EMBEDDED_RPC_ZEPHYR_SPI_MASTER_TRANSPORT_H_
+#endif // _EMBEDDED_FSP_ABS_MASTER_TRANSPORT_H_

@@ -14,50 +14,50 @@ using namespace erpc;
 // Variables
 ////////////////////////////////////////////////////////////////////////////////
 
-ERPC_MANUALLY_CONSTRUCTED_STATIC(SpiMasterTransport, s_spiTransport);
+ERPC_MANUALLY_CONSTRUCTED_STATIC(AbsMasterTransport, s_absTransport);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Code
 ////////////////////////////////////////////////////////////////////////////////
 
-erpc_transport_t erpc_transport_zephyr_spi_master_init(void *dev, void *int_pin)
+erpc_transport_t erpc_transport_fsp_abs_master_init(void * p_abs_instance, void * p_ioport_instance, uint16_t int_pin)
 {
-    SpiMasterTransport *spiTransport;
+    AbsMasterTransport *absTransport;
 
 #if ERPC_ALLOCATION_POLICY == ERPC_ALLOCATION_POLICY_STATIC
-    if (s_spiTransport.isUsed())
+    if (s_absTransport.isUsed())
     {
-        spiTransport = NULL;
+        absTransport = NULL;
     }
     else
     {
-        s_spiTransport.construct(reinterpret_cast<struct spi_dt_spec *>(dev), reinterpret_cast<struct gpio_dt_spec *>(int_pin));
-        spiTransport = s_spiTransport.get();
+        s_absTransport.construct(reinterpret_cast<R_SPI0_Type *>(baseAddr), baudRate, srcClock_Hz);
+        absTransport = s_absTransport.get();
     }
 #elif ERPC_ALLOCATION_POLICY == ERPC_ALLOCATION_POLICY_DYNAMIC
-    spiTransport = new SpiMasterTransport(reinterpret_cast<struct spi_dt_spec *>(dev), reinterpret_cast<struct gpio_dt_spec *>(int_pin));
+    absTransport = new AbsMasterTransport(p_abs_instance, p_ioport_instance, int_pin);
 #else
 #error "Unknown eRPC allocation policy!"
 #endif
 
-    if (spiTransport != NULL)
+    if (absTransport != NULL)
     {
-        (void)spiTransport->init();
+        (void)absTransport->init();
     }
 
-    return reinterpret_cast<erpc_transport_t>(spiTransport);
+    return reinterpret_cast<erpc_transport_t>(absTransport);
 }
 
-void erpc_transport_zephyr_spi_master_deinit(erpc_transport_t transport)
+void erpc_transport_fsp_abs_master_deinit(erpc_transport_t transport)
 {
 #if ERPC_ALLOCATION_POLICY == ERPC_ALLOCATION_POLICY_STATIC
     (void)transport;
-    s_spiTransport.destroy();
+    s_absTransport.destroy();
 #elif ERPC_ALLOCATION_POLICY == ERPC_ALLOCATION_POLICY_DYNAMIC
     erpc_assert(transport != NULL);
 
-    SpiMasterTransport *spiTransport = reinterpret_cast<SpiMasterTransport *>(transport);
+    AbsMasterTransport *absTransport = reinterpret_cast<AbsMasterTransport *>(transport);
 
-    delete spiTransport;
+    delete absTransport;
 #endif
 }
