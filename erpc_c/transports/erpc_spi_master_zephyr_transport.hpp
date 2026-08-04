@@ -69,13 +69,9 @@ public:
     void ready_cb(void);
 
 protected:
-#if (CFG_ERPC_TRANSPORT == ERPC_TRANSPORT_UART)
-    uart_instance_t *m_abs_inst;
-#elif (CFG_ERPC_TRANSPORT == ERPC_TRANSPORT_SPI)
-    spi_instance_t *m_abs_inst;
-#endif
-    ioport_instance_t *m_ioport_inst;
-    bsp_io_port_pin_t m_int_pin;
+    struct spi_dt_spec *m_abs_inst;
+    struct gpio_dt_spec *m_ioport_inst;
+    uint16_t m_int_pin;
     bool m_isInited;         /*!< the transport peripheral init status flag */
 #if ERPC_THREADS
     Semaphore m_slaveReadySemaphore;
