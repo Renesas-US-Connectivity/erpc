@@ -59,6 +59,11 @@ K_THREAD_STACK_DEFINE(s_transport_stack, 4096);
 
 static constexpr uint16_t kSpiCmdTxReq = 0x10U;
 static constexpr uint16_t kSpiRespAckOk = 0x00AAU;
+<<<<<<< HEAD
+static constexpr uint32_t kErpcHeaderSize = 6U;
+static constexpr uint32_t kTransportMaxFrameLen = 0xFFFFU;
+=======
+>>>>>>> origin/erpc_transport_port
 static constexpr uint32_t kDrdyTimeoutMs = 100U;
 static constexpr uint32_t kQueueTimeoutMs = 100U;
 static constexpr uint32_t kSpiTimeoutMs = 200U;
@@ -208,9 +213,31 @@ static bool wait_for_drdy_irq_or_level(struct gpio_dt_spec *ioport, k_timeout_t 
     return gpio_pin_get_dt(ioport) == 0;
 }
 
+<<<<<<< HEAD
+static void drain_and_free_queue(QueueHandle_t q)
+{
+    transport_queue_item_t *pkt = NULL;
+
+    while (xQueueReceive(q, &pkt, K_NO_WAIT) == pdTRUE)
+    {
+        if (pkt != NULL)
+        {
+            vPortFree(pkt);
+            erpc_comms_struct.nof_free++;
+            pkt = NULL;
+        }
+    }
+}
+
 static void transport_recover(struct spi_dt_spec *spec, struct gpio_dt_spec *ioport)
 {
     ARG_UNUSED(spec);
+    drain_and_free_queue(g_rx_queue);
+=======
+static void transport_recover(struct spi_dt_spec *spec, struct gpio_dt_spec *ioport)
+{
+    ARG_UNUSED(spec);
+>>>>>>> origin/erpc_transport_port
     k_msgq_purge(&s_rx_queue);
     while (k_sem_take(&s_drdy_sem, K_NO_WAIT) == 0) {
     }
@@ -445,6 +472,24 @@ erpc_status_t AbsMasterTransport::init(void)
     {
         return kErpcStatus_Fail;
     }
+<<<<<<< HEAD
+
+    if (gpio_pin_configure_dt(m_ioport_inst, GPIO_INPUT) != 0)
+    {
+        return kErpcStatus_Fail;
+    }
+
+    gpio_init_callback(&s_drdy_cb_data, drdy_isr, BIT(m_ioport_inst->pin));
+    if (gpio_add_callback(m_ioport_inst->port, &s_drdy_cb_data) != 0) {
+        return kErpcStatus_Fail;
+    }
+
+    if (gpio_pin_interrupt_configure_dt(m_ioport_inst, GPIO_INT_EDGE_TO_ACTIVE) != 0) {
+        return kErpcStatus_Fail;
+    }
+
+#ifdef ERPC_BOARD_ABS_SLAVE_READY_USE_GPIO
+=======
 
     if (gpio_pin_configure_dt(m_ioport_inst, GPIO_INPUT) != 0)
     {
@@ -461,6 +506,7 @@ erpc_status_t AbsMasterTransport::init(void)
     }
 
 #ifdef ERPC_BOARD_SPI_SLAVE_READY_USE_GPIO
+>>>>>>> origin/erpc_transport_port
     // If slave is already asserting ready, unblock immediately.
     if (pin_is_asserted(m_ioport_inst))
     {
@@ -508,35 +554,69 @@ void AbsMasterTransport::wait_for_slave_ready()
 
 erpc_status_t AbsMasterTransport::underlyingReceive(uint8_t * data, uint32_t size)
  {
+    static transport_queue_item_t *p_pkt = NULL;
+    static uint16_t pending_payload_len = 0U;
 
-    static transport_queue_item_t *p_pkt;
-     //GCTODO CHECK LENGTH
+    if ((data == NULL) && (size > 0U))
+    {
+        return kErpcStatus_Fail;
+    }
+
     // Block indefinitely until data arrives from the eRPC Communication Task
-    if((erpc_comms_struct.erpc_rx_state == 0) && (size==6))
+    if((erpc_comms_struct.erpc_rx_state == 0) && (size == kErpcHeaderSize))
     {
 
         if (xQueueReceive(g_rx_queue, &p_pkt, portMAX_DELAY) == pdTRUE) {
             erpc_comms_struct.rx_queue_in_erpc++;
-            // Copy queue item to internal class buffer
-            //memcpy(m_incomingBuffer, item.data, item.len);
+
+            if ((p_pkt == NULL) || (p_pkt->len < kErpcHeaderSize))
+            {
+                if (p_pkt != NULL)
+                {
+                    vPortFree(p_pkt);
+                    erpc_comms_struct.nof_free++;
+                    p_pkt = NULL;
+                }
+                erpc_comms_struct.erpc_rx_state = 0;
+                pending_payload_len = 0U;
+                return kErpcStatus_Fail;
+            }
+
             memcpy(data, &p_pkt->data[0], size);
+            pending_payload_len = static_cast<uint16_t>(p_pkt->len - kErpcHeaderSize);
             erpc_comms_struct.erpc_rx_state = 1;
         } else {
-            vPortFree(p_pkt);
-            erpc_comms_struct.nof_free++;
             erpc_comms_struct.erpc_rx_state = 0;
+            pending_payload_len = 0U;
             return kErpcStatus_Fail; // Should not happen with portMAX_DELAY
         }
     }
     else if( erpc_comms_struct.erpc_rx_state ==1)
     {
-         //CHECKS GCTODO
-         memcpy(data, &p_pkt->data[6], size);
+         if ((p_pkt == NULL) || (size != pending_payload_len))
+         {
+             if (p_pkt != NULL)
+             {
+                 vPortFree(p_pkt);
+                 erpc_comms_struct.nof_free++;
+                 p_pkt = NULL;
+             }
+             erpc_comms_struct.erpc_rx_state = 0;
+             pending_payload_len = 0U;
+             return kErpcStatus_Fail;
+         }
+
+         if (size > 0U)
+         {
+             memcpy(data, &p_pkt->data[kErpcHeaderSize], size);
+         }
 #if (CFG_ERPC_TRANSPORT == ERPC_TRANSPORT_SPI)
          vPortFree(p_pkt);
 #endif
          erpc_comms_struct.nof_free++;
+         p_pkt = NULL;
          erpc_comms_struct.erpc_rx_state = 0;
+         pending_payload_len = 0U;
 //         vTaskDelay(pdMS_TO_TICKS(10));
     }
     else
@@ -548,6 +628,17 @@ erpc_status_t AbsMasterTransport::underlyingReceive(uint8_t * data, uint32_t siz
 
 erpc_status_t AbsMasterTransport::underlyingSend(const uint8_t * data, uint32_t size)
 {
+    if ((data == NULL) && (size > 0U))
+    {
+        return kErpcStatus_Fail;
+    }
+
+    if (size > kTransportMaxFrameLen)
+    {
+        erpc_comms_struct.erpc_malloc_failed++;
+        erpc_comms_struct.size_malloc_failed = size;
+        return kErpcStatus_MemoryError;
+    }
 
     transport_queue_item_t *p_pkt = (transport_queue_item_t *)pvPortMalloc(sizeof(transport_queue_item_t) + size);
 
@@ -562,8 +653,10 @@ erpc_status_t AbsMasterTransport::underlyingSend(const uint8_t * data, uint32_t 
 
 
     //GCTODO CHECK SIZE
-
-     memcpy(p_pkt->data, data, size);
+    if (size > 0U)
+    {
+        memcpy(p_pkt->data, data, size);
+    }
 
     p_pkt->len = (uint16_t) size;
     if (xQueueSend(g_tx_queue, &p_pkt, pdMS_TO_TICKS(100)) != pdTRUE)
