@@ -20,7 +20,7 @@ ERPC_MANUALLY_CONSTRUCTED_STATIC(AbsMasterTransport, s_absTransport);
 // Code
 ////////////////////////////////////////////////////////////////////////////////
 
-erpc_transport_t erpc_transport_fsp_abs_master_init(void * p_abs_instance, void * p_ioport_instance, uint16_t int_pin)
+erpc_transport_t erpc_transport_zephyr_spi_master_init(void * p_abs_instance, void * p_ioport_instance)
 {
     AbsMasterTransport *absTransport;
 
@@ -31,11 +31,11 @@ erpc_transport_t erpc_transport_fsp_abs_master_init(void * p_abs_instance, void 
     }
     else
     {
-        s_absTransport.construct(reinterpret_cast<R_SPI0_Type *>(baseAddr), baudRate, srcClock_Hz);
+        s_absTransport.construct(p_abs_instance, p_ioport_instance, 0);
         absTransport = s_absTransport.get();
     }
 #elif ERPC_ALLOCATION_POLICY == ERPC_ALLOCATION_POLICY_DYNAMIC
-    absTransport = new AbsMasterTransport(p_abs_instance, p_ioport_instance, int_pin);
+    absTransport = new AbsMasterTransport(p_abs_instance, p_ioport_instance, 0);
 #else
 #error "Unknown eRPC allocation policy!"
 #endif
@@ -48,7 +48,7 @@ erpc_transport_t erpc_transport_fsp_abs_master_init(void * p_abs_instance, void 
     return reinterpret_cast<erpc_transport_t>(absTransport);
 }
 
-void erpc_transport_fsp_abs_master_deinit(erpc_transport_t transport)
+void erpc_transport_zephyr_spi_master_deinit(erpc_transport_t transport)
 {
 #if ERPC_ALLOCATION_POLICY == ERPC_ALLOCATION_POLICY_STATIC
     (void)transport;
