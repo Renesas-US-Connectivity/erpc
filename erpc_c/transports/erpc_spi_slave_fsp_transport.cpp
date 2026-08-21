@@ -7,10 +7,21 @@
 
 #include <cstdio>
 #include <new>
+#include <cstring>
+
+#include "bsp_cfg.h"
+
+extern "C" {
+#include "ra6w1_data_path.h"
+}
 
 extern "C" {
 #include "r_gpio_w.h"
 #include "r_spi_w.h"
+#include "FreeRTOS.h"
+#include "queue.h"
+#include "task.h"
+#include "semphr.h"
 }
 
 
@@ -34,6 +45,27 @@ using namespace erpc;
 ////////////////////////////////////////////////////////////////////////////////
 
 static volatile bool s_isTransferCompleted = false;
+static SpiSlaveTransport *s_spi_slave_instance = NULL;
+
+enum spi_slave_io_op
+{
+    kSpiSlaveIoOp_Receive = 0,
+    kSpiSlaveIoOp_Send,
+};
+
+struct spi_slave_io_req
+{
+    spi_slave_io_op op;
+    const uint8_t *tx;
+    uint8_t *rx;
+    uint32_t size;
+    erpc_status_t result;
+    SemaphoreHandle_t done;
+};
+
+static QueueHandle_t s_spi_slave_tx_q = NULL;
+static QueueHandle_t s_spi_slave_rx_q = NULL;
+static TaskHandle_t s_spi_slave_io_task = NULL;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Code
@@ -95,6 +127,7 @@ m_spi_inst((spi_instance_t*)p_spi_instance), m_ioport_inst((ioport_instance_t*)p
 m_txrxSemaphore()
 #endif
 {
+    s_spi_slave_instance = this;
 }
 
 SpiSlaveTransport::~SpiSlaveTransport(void)
@@ -135,10 +168,182 @@ erpc_status_t SpiSlaveTransport::init(void)
 #endif
 
     m_isInited = true;
+
+    if (s_spi_slave_tx_q == NULL)
+    {
+        s_spi_slave_tx_q = xQueueCreate(16, sizeof(spi_slave_io_req *));
+        if (s_spi_slave_tx_q == NULL)
+        {
+            return kErpcStatus_InitFailed;
+        }
+    }
+
+    if (s_spi_slave_rx_q == NULL)
+    {
+        s_spi_slave_rx_q = xQueueCreate(16, sizeof(spi_slave_io_req *));
+        if (s_spi_slave_rx_q == NULL)
+        {
+            return kErpcStatus_InitFailed;
+        }
+    }
+
+    if (s_spi_slave_io_task == NULL)
+    {
+        BaseType_t rc = xTaskCreate(SpiSlaveTransport::ioWorker,
+                                    "erpc_spi_slv_io",
+                                    4096 / sizeof(StackType_t),
+                                    NULL,
+                                    tskIDLE_PRIORITY + 3,
+                                    &s_spi_slave_io_task);
+        if (rc != pdPASS)
+        {
+            return kErpcStatus_InitFailed;
+        }
+    }
+
     return kErpcStatus_Success;
 }
 
+void SpiSlaveTransport::ioWorker(void *arg)
+{
+    FSP_PARAMETER_NOT_USED(arg);
+
+    while (true)
+    {
+        spi_slave_io_req *req = NULL;
+
+        if (xQueueReceive(s_spi_slave_tx_q, &req, 0) != pdTRUE)
+        {
+            (void)xQueueReceive(s_spi_slave_rx_q, &req, 0);
+        }
+
+        if (req == NULL)
+        {
+            vTaskDelay(1);
+            continue;
+        }
+
+        if (s_spi_slave_instance == NULL)
+        {
+            req->result = kErpcStatus_Fail;
+            (void)xSemaphoreGive(req->done);
+            continue;
+        }
+
+        if (req->op == kSpiSlaveIoOp_Receive)
+        {
+            req->result = s_spi_slave_instance->underlyingReceiveImmediate(req->rx, req->size);
+        }
+        else
+        {
+            req->result = s_spi_slave_instance->underlyingSendImmediate(req->tx, req->size);
+        }
+
+        (void)xSemaphoreGive(req->done);
+    }
+}
+
+erpc_status_t SpiSlaveTransport::receive(MessageBuffer *message)
+{
+#if defined(CONFIG_DATA_PATH) && (CONFIG_DATA_PATH == 1)
+    const uint8_t hdr = reserveHeaderSize();
+
+    for (;;)
+    {
+        erpc_status_t status = FramedTransport::receive(message);
+        if (status != kErpcStatus_Success)
+        {
+            return status;
+        }
+
+        if (message->getUsed() < hdr)
+        {
+            return kErpcStatus_Success;
+        }
+
+        uint8_t *body = message->get() + hdr;
+        uint16_t body_len = (uint16_t)(message->getUsed() - hdr);
+
+        if (!ra6w1_dp_is_data_path_frame(body, body_len))
+        {
+            return kErpcStatus_Success;
+        }
+
+        uint16_t cap = (uint16_t)(message->getLength() - hdr);
+        uint16_t resp_len = 0;
+
+        int rc = ra6w1_dp_enqueue_and_wait(body,
+                                           body_len,
+                                           body,
+                                           cap,
+                                           &resp_len,
+                                           10000U);
+        if (rc != 0)
+        {
+            continue;
+        }
+
+        message->setUsed((uint16_t)(resp_len + hdr));
+        status = FramedTransport::send(message);
+        if (status != kErpcStatus_Success)
+        {
+            return status;
+        }
+    }
+#else
+    return FramedTransport::receive(message);
+#endif
+}
+
 erpc_status_t SpiSlaveTransport::underlyingReceive(uint8_t *data, uint32_t size)
+{
+    spi_slave_io_req *req = (spi_slave_io_req *)pvPortMalloc(sizeof(spi_slave_io_req));
+    if (req == NULL)
+    {
+        return kErpcStatus_MemoryError;
+    }
+
+    req->op = kSpiSlaveIoOp_Receive;
+    req->tx = NULL;
+    req->rx = data;
+    req->size = size;
+    req->result = kErpcStatus_Fail;
+    req->done = xSemaphoreCreateBinary();
+    if (req->done == NULL)
+    {
+        vPortFree(req);
+        return kErpcStatus_MemoryError;
+    }
+
+    if (s_spi_slave_rx_q == NULL)
+    {
+        vSemaphoreDelete(req->done);
+        vPortFree(req);
+        return kErpcStatus_Fail;
+    }
+
+    if (xQueueSend(s_spi_slave_rx_q, &req, portMAX_DELAY) != pdTRUE)
+    {
+        vSemaphoreDelete(req->done);
+        vPortFree(req);
+        return kErpcStatus_Timeout;
+    }
+
+    if (xSemaphoreTake(req->done, portMAX_DELAY) != pdTRUE)
+    {
+        vSemaphoreDelete(req->done);
+        vPortFree(req);
+        return kErpcStatus_Fail;
+    }
+
+    erpc_status_t result = req->result;
+    vSemaphoreDelete(req->done);
+    vPortFree(req);
+
+    return result;
+}
+
+erpc_status_t SpiSlaveTransport::underlyingReceiveImmediate(uint8_t *data, uint32_t size)
 {
     fsp_err_t status;
     uint8_t *rxData = data;
@@ -178,6 +383,54 @@ erpc_status_t SpiSlaveTransport::underlyingReceive(uint8_t *data, uint32_t size)
 }
 
 erpc_status_t SpiSlaveTransport::underlyingSend(const uint8_t *data, uint32_t size)
+{
+    spi_slave_io_req *req = (spi_slave_io_req *)pvPortMalloc(sizeof(spi_slave_io_req));
+    if (req == NULL)
+    {
+        return kErpcStatus_MemoryError;
+    }
+
+    req->op = kSpiSlaveIoOp_Send;
+    req->tx = data;
+    req->rx = NULL;
+    req->size = size;
+    req->result = kErpcStatus_Fail;
+    req->done = xSemaphoreCreateBinary();
+    if (req->done == NULL)
+    {
+        vPortFree(req);
+        return kErpcStatus_MemoryError;
+    }
+
+    if (s_spi_slave_tx_q == NULL)
+    {
+        vSemaphoreDelete(req->done);
+        vPortFree(req);
+        return kErpcStatus_Fail;
+    }
+
+    if (xQueueSend(s_spi_slave_tx_q, &req, portMAX_DELAY) != pdTRUE)
+    {
+        vSemaphoreDelete(req->done);
+        vPortFree(req);
+        return kErpcStatus_Timeout;
+    }
+
+    if (xSemaphoreTake(req->done, portMAX_DELAY) != pdTRUE)
+    {
+        vSemaphoreDelete(req->done);
+        vPortFree(req);
+        return kErpcStatus_Fail;
+    }
+
+    erpc_status_t result = req->result;
+    vSemaphoreDelete(req->done);
+    vPortFree(req);
+
+    return result;
+}
+
+erpc_status_t SpiSlaveTransport::underlyingSendImmediate(const uint8_t *data, uint32_t size)
 {
     fsp_err_t status;
     s_isTransferCompleted = false;

@@ -31,7 +31,7 @@ erpc_transport_t erpc_transport_fsp_spi_slave_init(void * p_spi_instance, void *
     }
     else
     {
-        s_spiTransport.construct(reinterpret_cast<SPI_Type *>(baseAddr), baudRate, srcClock_Hz);
+        s_spiTransport.construct(p_spi_instance, p_ioport_instance, int_pin);
         spiTransport = s_spiTransport.get();
     }
 #elif ERPC_ALLOCATION_POLICY == ERPC_ALLOCATION_POLICY_DYNAMIC
@@ -42,7 +42,16 @@ erpc_transport_t erpc_transport_fsp_spi_slave_init(void * p_spi_instance, void *
 
     if (spiTransport != NULL)
     {
-        (void)spiTransport->init();
+        erpc_status_t initStatus = spiTransport->init();
+        if (initStatus != kErpcStatus_Success)
+        {
+#if ERPC_ALLOCATION_POLICY == ERPC_ALLOCATION_POLICY_STATIC
+            s_spiTransport.destroy();
+#elif ERPC_ALLOCATION_POLICY == ERPC_ALLOCATION_POLICY_DYNAMIC
+            delete spiTransport;
+#endif
+            spiTransport = NULL;
+        }
     }
 
     return reinterpret_cast<erpc_transport_t>(spiTransport);

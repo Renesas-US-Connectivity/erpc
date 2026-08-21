@@ -59,6 +59,15 @@ public:
      */
     virtual erpc_status_t init(void);
 
+    /*! 
+     * @brief Receive framed messages and route data-path frames before decode.
+     *
+     * In data-path builds this function consumes DP frames, executes the
+     * socket fast-path response, sends that response immediately, and waits
+     * for the next frame. Normal eRPC frames are returned to the server.
+     */
+    virtual erpc_status_t receive(MessageBuffer *message) override;
+
     /*!
      * @brief Function called from SPI_SlaveUserCallback when SPI transfer is completed
      *
@@ -78,6 +87,10 @@ protected:
 private:
     using FramedTransport::underlyingReceive;
     using FramedTransport::underlyingSend;
+
+    erpc_status_t underlyingReceiveImmediate(uint8_t *data, uint32_t size);
+    erpc_status_t underlyingSendImmediate(const uint8_t *data, uint32_t size);
+    static void ioWorker(void *arg);
 
     /*!
      * @brief Receive data from SPI peripheral.
