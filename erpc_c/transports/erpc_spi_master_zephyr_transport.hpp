@@ -78,6 +78,12 @@ private:
     using FramedTransport::underlyingReceive;
     using FramedTransport::underlyingSend;
 
+    erpc_status_t ensureIoWorkerStarted(void);
+    erpc_status_t waitForSlaveReady(void);
+    erpc_status_t underlyingReceiveImmediate(uint8_t *data, uint32_t size, uint32_t traceId);
+    erpc_status_t underlyingSendImmediate(const uint8_t *data, uint32_t size, uint32_t traceId);
+    static void ioWorker(void *arg1, void *arg2, void *arg3);
+
     /*!
      * @brief Receive data from SPI peripheral.
      *

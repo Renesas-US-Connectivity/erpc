@@ -42,7 +42,16 @@ erpc_transport_t erpc_transport_zephyr_spi_master_init(void *dev, void *int_pin)
 
     if (spiTransport != NULL)
     {
-        (void)spiTransport->init();
+        erpc_status_t initStatus = spiTransport->init();
+        if (initStatus != kErpcStatus_Success)
+        {
+#if ERPC_ALLOCATION_POLICY == ERPC_ALLOCATION_POLICY_STATIC
+            s_spiTransport.destroy();
+#elif ERPC_ALLOCATION_POLICY == ERPC_ALLOCATION_POLICY_DYNAMIC
+            delete spiTransport;
+#endif
+            spiTransport = NULL;
+        }
     }
 
     return reinterpret_cast<erpc_transport_t>(spiTransport);

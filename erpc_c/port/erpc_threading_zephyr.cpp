@@ -107,8 +107,8 @@ bool Mutex::unlock(void)
 
 Semaphore::Semaphore(int count) : m_sem()
 {
-    // Binary semaphore: keep at most one pending slave-ready indication.
-    k_sem_init(&m_sem, count, 1);
+    // Set max count to highest signed int.
+    k_sem_init(&m_sem, count, 0x7fffffff);
 }
 
 Semaphore::~Semaphore(void) {}
@@ -120,6 +120,18 @@ void Semaphore::put(void)
 
 bool Semaphore::get(uint32_t timeoutUsecs)
 {
+    if (timeoutUsecs != kWaitForever)
+    {
+        if (timeoutUsecs > 0U)
+        {
+            timeoutUsecs /= 1000U;
+            if (timeoutUsecs == 0U)
+            {
+                timeoutUsecs = 1U;
+            }
+        }
+    }
+
     return (k_sem_take(&m_sem, K_USEC(timeoutUsecs)) == 0);
 }
 

@@ -575,6 +575,19 @@ erpc_transport_t erpc_transport_zephyr_spi_master_init(void *dev, void *int_pin)
  */
 void erpc_transport_zephyr_spi_master_deinit(erpc_transport_t transport);
 
+/*
+ * Send and receive raw framed message bodies over the Zephyr SPI master
+ * transport. These helpers reuse transport framing/CRC while bypassing the
+ * eRPC codec for fixed-layout data-path payloads.
+ */
+int erpc_transport_zephyr_spi_master_dp_send(struct ErpcTransport *transport,
+                            const uint8_t *frame,
+                            uint16_t len);
+int erpc_transport_zephyr_spi_master_dp_recv(struct ErpcTransport *transport,
+                            uint8_t *out,
+                            uint16_t out_cap,
+                            uint16_t *out_len);
+
 //@}
 
 //! @name USB CDC transport setup
