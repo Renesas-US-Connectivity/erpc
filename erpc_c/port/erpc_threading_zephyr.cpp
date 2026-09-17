@@ -107,8 +107,8 @@ bool Mutex::unlock(void)
 
 Semaphore::Semaphore(int count) : m_sem()
 {
-    // Set max count to highest signed int.
-    k_sem_init(&m_sem, count, 0x7fffffff);
+    // Binary semaphore: keep at most one pending slave-ready indication.
+    k_sem_init(&m_sem, count, 1);
 }
 
 Semaphore::~Semaphore(void) {}
