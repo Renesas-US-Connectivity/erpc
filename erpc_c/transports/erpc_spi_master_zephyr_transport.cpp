@@ -190,7 +190,7 @@ erpc_status_t SpiMasterTransport::underlyingSend(const uint8_t *data, uint32_t s
     s_isSlaveReady = false;
 #else
 #ifdef ERPC_SEND_OPERATION_TOUT_US
-    ret = m_slaveReadySemaphore.get(500U * 1000U);
+    ret = m_slaveReadySemaphore.get(CONFIG_ERPC_SPI_READY_TIMEOUT_MS);
     if (!ret) {
         return kErpcStatus_Timeout;
     }

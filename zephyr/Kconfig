@@ -60,4 +60,16 @@ config ERPC_ARBITRATED_CLIENT
 	help
 	  When enabled, eRPC will include arbitrated client.
 
+config ERPC_SPI_READY_TIMEOUT_MS
+	int "SPI slave-ready phase timeout"
+	default 15000
+	range 1000 60000
+	help
+	  Maximum time in milliseconds that one SPI transport phase waits for
+	  slave-ready. Synchronous command waits are clamped above this value.
+
+module = ERPC_SPI_TRANSPORT
+module-str = eRPC SPI master transport
+source "subsys/logging/Kconfig.template.log_config"
+
 endif # ERPC
