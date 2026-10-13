@@ -75,10 +75,10 @@ static TaskHandle_t s_spi_slave_io_task = NULL;
 /* @brief Initialize the GPIO used to notify the SPI Master */
 void SpiSlaveTransport::SpiSlaveTransport_NotifyTransferGpioInit(void)
 {
-	uint32_t pin_cfg = ((uint32_t) IOPORT_CFG_DRIVE_STRENGTH_BA_8MA
-					  | (uint32_t) IOPORT_CFG_PORT_DIRECTION_OUTPUT
-					  | (uint32_t) IOPORT_CFG_PORT_OUTPUT_LOW
-					  | (uint32_t) IOPORT_CFG_SLEW_RATE_SLOW);
+	uint32_t pin_cfg = ((uint32_t) GPIO_W_CFG_DRV_8mA
+					  | (uint32_t) GPIO_W_CFG_PORT_DIRECTION_OUTPUT
+					  | (uint32_t) GPIO_W_CFG_PORT_OUTPUT_LOW
+					  | (uint32_t) GPIO_W_CFG_SLW_SLOW);
 
 	R_GPIO_W_PinCfg(m_ioport_inst->p_ctrl, m_int_pin, pin_cfg);
 }
