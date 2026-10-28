@@ -57,11 +57,19 @@ struct spi_master_io_req
 
 K_MSGQ_DEFINE(s_spi_master_tx_q, sizeof(spi_master_io_req *), 16, 4);
 K_MSGQ_DEFINE(s_spi_master_rx_q, sizeof(spi_master_io_req *), 16, 4);
+/* Wakes ioWorker when a TX/RX request is queued. Binary: coalesced wakes are OK
+ * because the worker drains both queues after each take. */
+K_SEM_DEFINE(s_spi_master_io_wake, 0, 1);
 K_THREAD_STACK_DEFINE(s_spi_master_io_stack, 4096);
 static struct k_thread s_spi_master_io_thread;
 static k_tid_t s_spi_master_io_tid;
 static K_MUTEX_DEFINE(s_spi_master_io_start_lock);
 static atomic_t s_spi_master_trace_seq;
+
+static void spi_master_io_queue_wake(void)
+{
+    k_sem_give(&s_spi_master_io_wake);
+}
 
 void SpiMasterTransport::ioWorker(void *arg1, void *arg2, void *arg3)
 {
@@ -71,43 +79,51 @@ void SpiMasterTransport::ioWorker(void *arg1, void *arg2, void *arg3)
 
     while (true)
     {
-        spi_master_io_req *req = NULL;
+        /* Idle with CPU sleep until a producer queues work. */
+        (void)k_sem_take(&s_spi_master_io_wake, K_FOREVER);
 
-        if (k_msgq_get(&s_spi_master_tx_q, &req, K_NO_WAIT) != 0)
+        /* Drain all pending TX (priority) then RX work for this wake. */
+        while (true)
         {
-            (void)k_msgq_get(&s_spi_master_rx_q, &req, K_NO_WAIT);
-        }
+            spi_master_io_req *req = NULL;
 
-        if (req == NULL)
-        {
-            k_sleep(K_MSEC(1));
-            continue;
-        }
+            if (k_msgq_get(&s_spi_master_tx_q, &req, K_NO_WAIT) != 0)
+            {
+                (void)k_msgq_get(&s_spi_master_rx_q, &req, K_NO_WAIT);
+            }
 
-        LOG_DBG("SPI worker start: trace=%u op=%d size=%u thread=%s",
-                req->trace_id, req->op, req->size,
-                k_thread_name_get(k_current_get()));
+            if (req == NULL)
+            {
+                break;
+            }
 
-        if (s_spi_master_instance == NULL)
-        {
-            req->result = kErpcStatus_Fail;
+            LOG_DBG("SPI worker start: trace=%u op=%d size=%u thread=%s",
+                    req->trace_id, req->op, req->size,
+                    k_thread_name_get(k_current_get()));
+
+            if (s_spi_master_instance == NULL)
+            {
+                req->result = kErpcStatus_Fail;
+                k_sem_give(&req->done);
+                continue;
+            }
+
+            if (req->op == kSpiMasterIoOp_Receive)
+            {
+                req->result = s_spi_master_instance->underlyingReceiveImmediate(
+                    req->rx, req->size, req->trace_id);
+            }
+            else
+            {
+                req->result = s_spi_master_instance->underlyingSendImmediate(
+                    req->tx, req->size, req->trace_id);
+            }
+
+            LOG_DBG("SPI worker done: trace=%u op=%d status=%d",
+                    req->trace_id, req->op, req->result);
+
             k_sem_give(&req->done);
-            continue;
         }
-
-        if (req->op == kSpiMasterIoOp_Receive)
-        {
-            req->result = s_spi_master_instance->underlyingReceiveImmediate(req->rx, req->size, req->trace_id);
-        }
-        else
-        {
-            req->result = s_spi_master_instance->underlyingSendImmediate(req->tx, req->size, req->trace_id);
-        }
-
-        LOG_DBG("SPI worker done: trace=%u op=%d status=%d",
-                req->trace_id, req->op, req->result);
-
-        k_sem_give(&req->done);
     }
 }
 
@@ -219,6 +235,8 @@ erpc_status_t SpiMasterTransport::underlyingReceive(uint8_t *data, uint32_t size
         k_free(req);
         return kErpcStatus_Fail;
     }
+    /* Put before wake so the worker never observes an empty queue after take. */
+    spi_master_io_queue_wake();
 
     if (k_sem_take(&req->done, K_FOREVER) != 0)
     {
@@ -332,6 +350,8 @@ erpc_status_t SpiMasterTransport::underlyingSend(const uint8_t *data, uint32_t s
         k_free(req);
         return kErpcStatus_Fail;
     }
+    /* Put before wake so the worker never observes an empty queue after take. */
+    spi_master_io_queue_wake();
 
     if (k_sem_take(&req->done, K_FOREVER) != 0)
     {
