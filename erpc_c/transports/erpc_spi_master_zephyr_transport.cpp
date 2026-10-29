@@ -66,6 +66,21 @@ static k_tid_t s_spi_master_io_tid;
 static K_MUTEX_DEFINE(s_spi_master_io_start_lock);
 static atomic_t s_spi_master_trace_seq;
 
+/*
+ * Slave-ready (SRDY) wait. One SPI phase waits at most this long; it matches
+ * the CONFIG_ERPC_SPI_READY_TIMEOUT_MS value the Wi-Fi driver already uses to
+ * size its command timeouts (default 15000, the previous hard-coded value).
+ */
+#ifdef CONFIG_ERPC_SPI_READY_TIMEOUT_MS
+#define SPI_SRDY_TIMEOUT_MS CONFIG_ERPC_SPI_READY_TIMEOUT_MS
+#else
+#define SPI_SRDY_TIMEOUT_MS 15000
+#endif
+/* Sample SRDY every 1 ms while the wait is short (normal phase-to-phase waits)... */
+#define SPI_SRDY_FAST_POLL_WINDOW_MS 20
+/* ...then back off, so a long wait (e.g. slave still booting) wakes the CPU rarely. */
+#define SPI_SRDY_SLOW_POLL_MS 10
+
 static void spi_master_io_queue_wake(void)
 {
     k_sem_give(&s_spi_master_io_wake);
@@ -257,9 +272,14 @@ erpc_status_t SpiMasterTransport::waitForSlaveReady(void)
      * The erpc::Semaphore Zephyr backend currently scales timeout values down
      * far too aggressively for this use case, so use direct GPIO polling for a
      * real wall-clock wait.
+     *
+     * Sleep between samples instead of busy-waiting, so the CPU can idle and
+     * lower-priority threads can run while the slave is not ready. Sampling
+     * is every 1 ms for the first SPI_SRDY_FAST_POLL_WINDOW_MS (same latency
+     * as before for normal waits), then every SPI_SRDY_SLOW_POLL_MS.
      */
     const int64_t start_ms = k_uptime_get();
-    const int64_t timeout_ms = 15000;
+    const int64_t timeout_ms = SPI_SRDY_TIMEOUT_MS;
 
     while (true)
     {
@@ -279,14 +299,16 @@ erpc_status_t SpiMasterTransport::waitForSlaveReady(void)
             return kErpcStatus_Success;
         }
 
-        if ((k_uptime_get() - start_ms) >= timeout_ms)
+        const int64_t elapsed_ms = k_uptime_get() - start_ms;
+
+        if (elapsed_ms >= timeout_ms)
         {
             LOG_ERR("SRDY wait timeout: elapsed_ms=%lld srdy=%d",
-                    (long long)(k_uptime_get() - start_ms), srdy);
+                    (long long)elapsed_ms, srdy);
             return kErpcStatus_Timeout;
         }
 
-        k_busy_wait(1000U);
+        k_msleep((elapsed_ms < SPI_SRDY_FAST_POLL_WINDOW_MS) ? 1 : SPI_SRDY_SLOW_POLL_MS);
     }
 #endif
 
