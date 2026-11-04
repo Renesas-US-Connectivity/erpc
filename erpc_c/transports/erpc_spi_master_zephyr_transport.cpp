@@ -76,6 +76,33 @@ static atomic_t s_spi_master_trace_seq;
 #else
 #define SPI_SRDY_TIMEOUT_MS 15000
 #endif
+/*
+ * Per-command SRDY limit set by the Wi-Fi driver around commands that are
+ * answered within milliseconds (0 = SPI_SRDY_TIMEOUT_MS).  Written by the
+ * driver command thread while it holds the transport lock, read by the io
+ * worker for that command's phases.
+ */
+static volatile uint32_t s_srdy_timeout_override_ms;
+/* True while the io worker waits for SRDY before a request header. */
+static volatile bool s_srdy_wait_header;
+/* Interval of the stall hook while a header wait is stuck. */
+#define SPI_SRDY_STALL_HOOK_PERIOD_MS 100
+
+extern "C" void erpc_spi_master_srdy_timeout_set(uint32_t timeout_ms)
+{
+    s_srdy_timeout_override_ms = timeout_ms;
+}
+
+/*
+ * Called every SPI_SRDY_STALL_HOOK_PERIOD_MS while a request header waits for
+ * SRDY (nothing of the request sent yet).  The Wi-Fi driver overrides it to
+ * send a wake pulse when the RA6W1 is in DPM.
+ */
+extern "C" __attribute__((weak)) void erpc_spi_master_srdy_stall_hook(uint32_t elapsed_ms)
+{
+    (void)elapsed_ms;
+}
+
 /* Sample SRDY every 1 ms while the wait is short (normal phase-to-phase waits)... */
 #define SPI_SRDY_FAST_POLL_WINDOW_MS 20
 /* ...then back off, so a long wait (e.g. slave still booting) wakes the CPU rarely. */
@@ -279,7 +306,10 @@ erpc_status_t SpiMasterTransport::waitForSlaveReady(void)
      * as before for normal waits), then every SPI_SRDY_SLOW_POLL_MS.
      */
     const int64_t start_ms = k_uptime_get();
-    const int64_t timeout_ms = SPI_SRDY_TIMEOUT_MS;
+    const uint32_t override_ms = s_srdy_timeout_override_ms;
+    const int64_t timeout_ms = (override_ms != 0U) ? (int64_t)override_ms : SPI_SRDY_TIMEOUT_MS;
+    const bool header_wait = s_srdy_wait_header;
+    int64_t next_hook_ms = SPI_SRDY_STALL_HOOK_PERIOD_MS;
 
     while (true)
     {
@@ -303,9 +333,15 @@ erpc_status_t SpiMasterTransport::waitForSlaveReady(void)
 
         if (elapsed_ms >= timeout_ms)
         {
-            LOG_ERR("SRDY wait timeout: elapsed_ms=%lld srdy=%d",
-                    (long long)elapsed_ms, srdy);
+            LOG_ERR("SRDY wait timeout: elapsed_ms=%lld srdy=%d%s",
+                    (long long)elapsed_ms, srdy, header_wait ? " (header)" : "");
             return kErpcStatus_Timeout;
+        }
+
+        if (header_wait && elapsed_ms >= next_hook_ms)
+        {
+            erpc_spi_master_srdy_stall_hook((uint32_t)elapsed_ms);
+            next_hook_ms = elapsed_ms + SPI_SRDY_STALL_HOOK_PERIOD_MS;
         }
 
         k_msleep((elapsed_ms < SPI_SRDY_FAST_POLL_WINDOW_MS) ? 1 : SPI_SRDY_SLOW_POLL_MS);
@@ -403,7 +439,9 @@ erpc_status_t SpiMasterTransport::underlyingSendImmediate(const uint8_t *data, u
 
     LOG_DBG("SPI send header wait: trace=%u hdr=%u total=%u",
             traceId, header_size, size);
+    s_srdy_wait_header = true;
     erpc_status_t ready = waitForSlaveReady();
+    s_srdy_wait_header = false;
     if (ready != kErpcStatus_Success)
     {
         LOG_ERR("SPI send header SRDY failed: trace=%u status=%d", traceId, ready);
